@@ -25,6 +25,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.NonTransientDataAccessException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Sort.Direction;
 
 @ExtendWith(MockitoExtension.class)
 class AppUserDatabaseTest {
@@ -62,6 +67,26 @@ class AppUserDatabaseTest {
     }
 
     @Test
+    void shouldSaveAllMethodReturnOnlyAppUsersWithUniquePhoneNumbers() throws DatabaseOperationException {
+        AppUser appUser1 = AppUserGenerator.generateAppUserWithPhoneNumber("555666777");
+        AppUser appUser2 = AppUserGenerator.generateAppUserWithPhoneNumber("555666777");
+        AppUser appUser3 = AppUserGenerator.generateAppUserWithPhoneNumber("545656777");
+
+        List<AppUser> appUsersToSave = List.of(appUser1, appUser2, appUser3);
+        List<com.radek.databasewithcsv.database.sql.model.AppUser> sqlAppUsersToSave = appUsersToSave.stream().map(appUser -> sqlModelMapper.toSqlAppUser(appUser)).collect(Collectors.toList());
+        List<AppUser> savedAppUsers = List.of(appUser1, appUser3);
+        List<com.radek.databasewithcsv.database.sql.model.AppUser> sqlSavedAppUsers = savedAppUsers.stream().map(appUser -> sqlModelMapper.toSqlAppUser(appUser)).collect(Collectors.toList());
+
+        when(appUserRepository.saveAll(sqlAppUsersToSave)).thenReturn(sqlSavedAppUsers);
+
+        Collection<AppUser> result = database.saveAll(appUsersToSave);
+
+        assertEquals(savedAppUsers, result);
+
+        verify(appUserRepository).saveAll(sqlAppUsersToSave);
+    }
+
+    @Test
     void shouldSaveAllMethodThrowExceptionWhenNonTransientDataAccessExceptionOccurDuringSavingAppUsers() {
         AppUser appUser1 = AppUserGenerator.generateAppUser();
         AppUser appUser2 = AppUserGenerator.generateAppUser();
@@ -72,46 +97,6 @@ class AppUserDatabaseTest {
 
         assertThrows(DatabaseOperationException.class, () -> database.saveAll(appUsers));
         verify(appUserRepository).saveAll(sqlAppUsers);
-    }
-
-    @Test
-    void shouldSaveAppUser() throws DatabaseOperationException {
-        AppUser appUser = AppUserGenerator.generateAppUser();
-        com.radek.databasewithcsv.database.sql.model.AppUser sqlAppUser = sqlModelMapper.toSqlAppUser(appUser);
-        when(appUserRepository.save(sqlAppUser)).thenReturn(sqlAppUser);
-
-        AppUser result = database.save(appUser);
-
-        assertEquals(appUser, result);
-        verify(appUserRepository).save(sqlAppUser);
-    }
-
-    @Test
-    void shouldSaveMethodThrowExceptionWhenAppUserIsNull() {
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> database.save(null));
-        assertEquals("App user cannot be null.", exception.getMessage());
-    }
-
-    @Test
-    void shouldSaveMethodThrowExceptionWhenPhoneNumberIsNotUnique() {
-        AppUser appUser = AppUserGenerator.generateAppUser();
-        when(appUserRepository.existsByPhoneNumber(appUser.getPhoneNumber())).thenReturn(true);
-
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> database.save(appUser));
-        assertEquals("Phone number has to be unique", exception.getMessage());
-        verify(appUserRepository).existsByPhoneNumber(appUser.getPhoneNumber());
-        verify(appUserRepository, never()).save(sqlModelMapper.toSqlAppUser(appUser));
-    }
-
-    @Test
-    void shouldSaveMethodThrowExceptionWhenNonTransientDataAccessExceptionOccurDuringSavingAppUser() {
-        AppUser appUser = AppUserGenerator.generateAppUser();
-        com.radek.databasewithcsv.database.sql.model.AppUser sqlAppUser = sqlModelMapper.toSqlAppUser(appUser);
-        doThrow(new NonTransientDataAccessException("") {
-        }).when(appUserRepository).save(sqlAppUser);
-
-        assertThrows(DatabaseOperationException.class, () -> database.save(appUser));
-        verify(appUserRepository).save(sqlAppUser);
     }
 
     @Test
@@ -146,11 +131,11 @@ class AppUserDatabaseTest {
         com.radek.databasewithcsv.database.sql.model.AppUser sqlAppUser = sqlModelMapper.toSqlAppUser(appUser);
         String searchName = appUser.getLastName().substring(0, 2);
         System.out.println(appUser);
-        when(appUserRepository.findAllByLastName(searchName)).thenReturn(List.of(sqlAppUser));
+        when(appUserRepository.findAllByLastNameIgnoreCaseContaining(searchName)).thenReturn(List.of(sqlAppUser));
 
         Collection<AppUser> result = database.getByLastName(searchName);
         assertEquals(List.of(appUser), result);
-        verify(appUserRepository).findAllByLastName(searchName);
+        verify(appUserRepository).findAllByLastNameIgnoreCaseContaining(searchName);
     }
 
     @Test
@@ -163,24 +148,46 @@ class AppUserDatabaseTest {
     void shouldGetByLastNameMethodThrowExceptionWhenNonTransientDataAccessExceptionOccurDuringGettingByLastName() {
         String lastName = "Example";
         doThrow(new NonTransientDataAccessException("") {
-        }).when(appUserRepository).findAllByLastName(lastName);
+        }).when(appUserRepository).findAllByLastNameIgnoreCaseContaining(lastName);
 
         assertThrows(DatabaseOperationException.class, () -> database.getByLastName(lastName));
-        verify(appUserRepository).findAllByLastName(lastName);
+        verify(appUserRepository).findAllByLastNameIgnoreCaseContaining(lastName);
     }
 
-    /*@Test
+    @Test
+    void shouldReturnFirstPageOfAppUsers() throws DatabaseOperationException {
+        List<AppUser> appUsers = List.of(AppUserGenerator.generateAppUser());
+        PageImpl pagedAppUsers = new PageImpl(appUsers);
+        List<com.radek.databasewithcsv.database.sql.model.AppUser> sqlAppUsers = appUsers.stream().map(appUser -> sqlModelMapper.toSqlAppUser(appUser)).collect(Collectors.toList());
+        PageImpl<com.radek.databasewithcsv.database.sql.model.AppUser> pagedSqlAppUsers = new PageImpl<>(sqlAppUsers);
+        when(appUserRepository.findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "birthDate")))).thenReturn(pagedSqlAppUsers);
+
+        Page<AppUser> result = database.getAppUsers();
+        assertEquals(pagedAppUsers, result);
+        verify(appUserRepository).findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "birthDate")));
+    }
+
+    @Test
+    void shouldGetFirstPageOfAppUsersMethodThrowExceptionWhenNonTransientDataAccessExceptionOccurWhileGettingAppUsers() {
+        doThrow(new NonTransientDataAccessException("") {
+        }).when(appUserRepository).findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "birthDate")));
+
+        assertThrows(DatabaseOperationException.class, () -> database.getAppUsers());
+        verify(appUserRepository).findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "birthDate")));
+    }
+
+    @Test
     void shouldReturnPageOfAppUsers() throws DatabaseOperationException {
         List<AppUser> appUsers = List.of(AppUserGenerator.generateAppUser());
         PageImpl pagedAppUsers = new PageImpl(appUsers);
         List<com.radek.databasewithcsv.database.sql.model.AppUser> sqlAppUsers = appUsers.stream().map(appUser -> sqlModelMapper.toSqlAppUser(appUser)).collect(Collectors.toList());
         PageImpl<com.radek.databasewithcsv.database.sql.model.AppUser> pagedSqlAppUsers = new PageImpl<>(sqlAppUsers);
-        when(appUserRepository.findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "birthName")))).thenReturn(pagedSqlAppUsers);
+        when(appUserRepository.findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "birthDate")))).thenReturn(pagedSqlAppUsers);
 
         Page<AppUser> result = database.getAppUsers(0);
         assertEquals(pagedAppUsers, result);
-        verify(appUserRepository).findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "birthName")));
-    }*/
+        verify(appUserRepository).findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "birthDate")));
+    }
 
     @Test
     void shouldGetAppUsersMethodThrowExceptionWhenPageNumberIsNull() {
@@ -188,33 +195,33 @@ class AppUserDatabaseTest {
         assertEquals("Page number cannot be null", exception.getMessage());
     }
 
-    /*@Test
+    @Test
     void shouldGetAppUsersMethodThrowExceptionWhenNonTransientDataAccessExceptionOccurWhileGettingAppUsers() {
         doThrow(new NonTransientDataAccessException("") {
-        }).when(appUserRepository).findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "birthName")));
+        }).when(appUserRepository).findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "birthDate")));
 
         assertThrows(DatabaseOperationException.class, () -> database.getAppUsers(0));
-        verify(appUserRepository).findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "birthName")));
-    }*/
+        verify(appUserRepository).findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "birthDate")));
+    }
 
     @Test
     void shouldReturnOldestAppUserWithPhoneNumber() throws DatabaseOperationException {
         AppUser appUser = AppUserGenerator.generateAppUser();
         com.radek.databasewithcsv.database.sql.model.AppUser sqlAppUser = sqlModelMapper.toSqlAppUser(appUser);
-        when(appUserRepository.findOneAppUserByBirthDateAndPhoneNumber()).thenReturn(Optional.of(sqlAppUser));
+        when(appUserRepository.findAll(Sort.by(Direction.ASC, "birthDate"))).thenReturn(List.of(Optional.of(sqlAppUser).get()));
 
         Optional<AppUser> result = database.getOldestAppUserWithPhoneNumber();
         assertEquals(appUser, result.get());
-        verify(appUserRepository).findOneAppUserByBirthDateAndPhoneNumber();
+        verify(appUserRepository).findAll(Sort.by(Direction.ASC, "birthDate"));
     }
 
     @Test
     void shouldReturnOldestAppUserWithPhoneNumberThrowExceptionWhenNonTransientDataAccessExceptionOccurDuringItsExecution() {
         doThrow(new NonTransientDataAccessException("") {
-        }).when(appUserRepository).findOneAppUserByBirthDateAndPhoneNumber();
+        }).when(appUserRepository).findAll(Sort.by(Direction.ASC, "birthDate"));
 
         assertThrows(DatabaseOperationException.class, () -> database.getOldestAppUserWithPhoneNumber());
-        verify(appUserRepository).findOneAppUserByBirthDateAndPhoneNumber();
+        verify(appUserRepository).findAll(Sort.by(Direction.ASC, "birthDate"));
     }
 
     @Test

@@ -1,28 +1,26 @@
 package com.radek.databasewithcsv.model;
 
+import com.opencsv.bean.CsvBindByName;
 import com.opencsv.bean.CsvCustomBindByName;
-import com.radek.databasewithcsv.csvhelper.converters.FirstNameConverter;
-import com.radek.databasewithcsv.csvhelper.converters.LastNameConverter;
 import com.radek.databasewithcsv.csvhelper.converters.LocalDateConverter;
-import com.radek.databasewithcsv.csvhelper.converters.PhoneNumberConverter;
+import com.radek.databasewithcsv.csvhelper.converters.NamesConverter;
 
-import java.time.LocalDate;
 import java.util.Objects;
 
 public class AppUser {
 
     private Long id;
 
-    @CsvCustomBindByName(column = "first_name", converter = FirstNameConverter.class)
+    @CsvCustomBindByName(column = "first_name", converter = NamesConverter.class)
     private String firstName;
 
-    @CsvCustomBindByName(column = "last_name", converter = LastNameConverter.class)
+    @CsvCustomBindByName(column = "last_name", converter = NamesConverter.class)
     private String lastName;
 
     @CsvCustomBindByName(column = "birth_date", converter = LocalDateConverter.class)
-    private LocalDate birthDate;
+    private String birthDate;
 
-    @CsvCustomBindByName(column = "phone_no", converter = PhoneNumberConverter.class)
+    @CsvBindByName(column = "phone_no")
     private String phoneNumber;
 
     public AppUser() {
@@ -52,7 +50,7 @@ public class AppUser {
         return lastName;
     }
 
-    public LocalDate getBirthDate() {
+    public String getBirthDate() {
         return birthDate;
     }
 
@@ -95,7 +93,7 @@ public class AppUser {
         private Long id;
         private String firstName;
         private String lastName;
-        private LocalDate birthDate;
+        private String birthDate;
         private String phoneNumber;
 
         public Builder withId(Long id) {
@@ -113,7 +111,7 @@ public class AppUser {
             return this;
         }
 
-        public Builder withBirthDate(LocalDate birthDate) {
+        public Builder withBirthDate(String birthDate) {
             this.birthDate = birthDate;
             return this;
         }

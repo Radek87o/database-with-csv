@@ -3,6 +3,7 @@ package com.radek.databasewithcsv.database;
 import com.radek.databasewithcsv.database.sql.model.AppUser;
 import com.radek.databasewithcsv.database.sql.model.SqlModelMapper;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -15,6 +16,7 @@ import org.springframework.dao.NonTransientDataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Sort.Direction;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -37,30 +39,18 @@ public class AppUserDatabase implements Database {
         }
         try {
             List<AppUser> sqlAppUsers = appUsers.stream().map(appUser -> sqlModelMapper.toSqlAppUser(appUser)).collect(Collectors.toList());
-            List<AppUser> savedAppUsers = appUserRepository.saveAll(sqlAppUsers);
+            List<AppUser> sqlValidatedAppUsers = new ArrayList<>();
+            for (AppUser appUser : sqlAppUsers) {
+                if (appUser.getPhoneNumber().length() == 0 || !appUserRepository.existsByPhoneNumber(appUser.getPhoneNumber())) {
+                    sqlValidatedAppUsers.add(appUser);
+                } else {
+                    log.error("User {} cannot be saved in database since his phone number is not unique", appUser.getFirstName() + " " + appUser.getLastName());
+                }
+            }
+            List<AppUser> savedAppUsers = appUserRepository.saveAll(sqlValidatedAppUsers);
             return savedAppUsers.stream().map(appUser -> sqlModelMapper.toAppUser(appUser)).collect(Collectors.toList());
         } catch (NonTransientDataAccessException e) {
             String message = "An error occurred during saving collection of users.";
-            log.error(message, e);
-            throw new DatabaseOperationException(message, e);
-        }
-    }
-
-    @Override
-    public com.radek.databasewithcsv.model.AppUser save(com.radek.databasewithcsv.model.AppUser appUser) throws DatabaseOperationException {
-        if (appUser == null) {
-            log.error("Attempt to save null app user");
-            throw new IllegalArgumentException("App user cannot be null.");
-        }
-        if (appUser.getPhoneNumber() != null && appUserRepository.existsByPhoneNumber(appUser.getPhoneNumber())) {
-            log.error("Attempt to save user with already existing phone number");
-            throw new IllegalArgumentException("Phone number has to be unique");
-        }
-        try {
-            AppUser sqlAppUser = sqlModelMapper.toSqlAppUser(appUser);
-            return sqlModelMapper.toAppUser(appUserRepository.save(sqlAppUser));
-        } catch (NonTransientDataAccessException e) {
-            String message = "An error occurred during saving app user.";
             log.error(message, e);
             throw new DatabaseOperationException(message, e);
         }
@@ -92,10 +82,22 @@ public class AppUserDatabase implements Database {
             throw new IllegalArgumentException("Last name cannot be null.");
         }
         try {
-            Collection<AppUser> appUsersWithLastName = appUserRepository.findAllByLastName(lastName);
+            Collection<AppUser> appUsersWithLastName = appUserRepository.findAllByLastNameIgnoreCaseContaining(lastName);
             return appUsersWithLastName.stream().map(appUser -> sqlModelMapper.toAppUser(appUser)).collect(Collectors.toList());
         } catch (NonTransientDataAccessException e) {
             String message = "An error occurred during getting app users by last name.";
+            log.error(message, e);
+            throw new DatabaseOperationException(message, e);
+        }
+    }
+
+    @Override
+    public Page<com.radek.databasewithcsv.model.AppUser> getAppUsers() throws DatabaseOperationException {
+        try {
+            Page<AppUser> appUsers = appUserRepository.findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "birthDate")));
+            return appUsers.map(appUser -> sqlModelMapper.toAppUser(appUser));
+        } catch (NonTransientDataAccessException e) {
+            String message = "An error occurred during getting first page of app users";
             log.error(message, e);
             throw new DatabaseOperationException(message, e);
         }
@@ -108,11 +110,6 @@ public class AppUserDatabase implements Database {
             throw new IllegalArgumentException("Page number cannot be null");
         }
         try {
-            Page<AppUser> basePage = appUserRepository.findAll(PageRequest.of(0, 5));
-            if (pageNumber > basePage.getTotalPages()) {
-                log.error("Attempt to get page of users for non-existing page number");
-                throw new IllegalArgumentException("Page number cannot be greater than total number of pages");
-            }
             Page<AppUser> appUsers = appUserRepository.findAll(PageRequest.of(pageNumber, 5, Sort.by(Sort.Direction.DESC, "birthDate")));
             return appUsers.map(appUser -> sqlModelMapper.toAppUser(appUser));
         } catch (NonTransientDataAccessException e) {
@@ -125,11 +122,12 @@ public class AppUserDatabase implements Database {
     @Override
     public Optional<com.radek.databasewithcsv.model.AppUser> getOldestAppUserWithPhoneNumber() throws DatabaseOperationException {
         try {
-            Optional<AppUser> oldestAppUser = appUserRepository.findOneAppUserByBirthDateAndPhoneNumber();
-            if (oldestAppUser.isEmpty()) {
+            List<AppUser> appUsers = appUserRepository.findAll(Sort.by(Direction.ASC, "birthDate"));
+            if (appUsers.isEmpty()) {
                 return Optional.empty();
             }
-            return Optional.of(sqlModelMapper.toAppUser(oldestAppUser.get()));
+            AppUser oldestAppUser = appUsers.stream().filter(appUser -> !appUser.getPhoneNumber().equals("")).collect(Collectors.toList()).get(0);
+            return Optional.of(sqlModelMapper.toAppUser(oldestAppUser));
         } catch (NonTransientDataAccessException e) {
             String message = "An error occurred during getting the oldest app user";
             log.error(message, e);
@@ -173,6 +171,35 @@ public class AppUserDatabase implements Database {
             return appUserRepository.count();
         } catch (NonTransientDataAccessException e) {
             String message = "An error occurred during getting number of app users.";
+            log.error(message, e);
+            throw new DatabaseOperationException(message, e);
+        }
+    }
+
+    @Override
+    public boolean existsByPhoneNumber(String phoneNumber) throws DatabaseOperationException {
+        if (phoneNumber == null || phoneNumber.length() == 0) {
+            return false;
+        }
+        try {
+            return appUserRepository.existsByPhoneNumber(phoneNumber);
+        } catch (NonTransientDataAccessException e) {
+            String message = "An error occurred during getting number of app users.";
+            log.error(message, e);
+            throw new DatabaseOperationException(message, e);
+        }
+    }
+
+    @Override
+    public boolean existsById(Long id) throws DatabaseOperationException {
+        if (id == null) {
+            log.error("Attempt to provide null id");
+            throw new IllegalArgumentException("Id cannot be null");
+        }
+        try {
+            return appUserRepository.existsById(id);
+        } catch (NonTransientDataAccessException e) {
+            String message = "An error occurred during checking whether app user exists.";
             log.error(message, e);
             throw new DatabaseOperationException(message, e);
         }

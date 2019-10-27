@@ -1,9 +1,9 @@
 first_name;last_name;birth_date;phone_no
 Stefan;Testowy;1988.11.11;600700800
 ;Kowalski;1987.08.07;
-Maria;Ziółko;1999.1.1;
+Maria;Ziółko;1999.1.1;;
 Maria;Ziółko2;1999.1.1;
 Marcin;;1976.12.11;444555666
 Karolina;Nowak;1990.03.33;556788999
-Jolanta;Magia;2000.2.04;666000111
+Jolanta;Magia;2000.2.04;666000111;
 Paweł;Pietrzak;1995.2.25;344555666

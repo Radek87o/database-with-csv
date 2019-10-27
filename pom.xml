@@ -87,6 +87,9 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <version>2.22.2</version>
+                <configuration>
+                    <skipTests>true</skipTests>
+                </configuration>
                 <executions>
                     <execution>
                         <goals>
@@ -143,7 +146,10 @@
                         <exclude>/com/radek/databasewithcsv/database/sql/model/*.class</exclude>
                         <exclude>/com/radek/databasewithcsv/database/DatabaseOperationException.class</exclude>
                         <exclude>/com/radek/databasewithcsv/csvhelper/converters/*.class</exclude>
-                        <exclude>/com/radek/databasewithcsv/csvhelper/CsvCustomParsingException.class</exclude>
+                        <exclude>/com/radek/databasewithcsv/csvhelper/*.class</exclude>
+                        <exclude>/com/radek/databasewithcsv/model/validation/Validator.class</exclude>
+                        <exclude>/com/radek/databasewithcsv/model/validation/RegexPatterns.class</exclude>
+                        <exclude>/com/radek/databasewithcsv/service/ServiceOperationException.class</exclude>
                     </excludes>
                 </configuration>
                 <executions>
