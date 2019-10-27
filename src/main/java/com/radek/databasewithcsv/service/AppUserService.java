@@ -145,19 +145,6 @@ public class AppUserService {
         }
     }
 
-    public boolean existsByPhoneNumber(String phoneNumber) throws ServiceOperationException {
-        if (phoneNumber == null || phoneNumber.length() == 0) {
-            return false;
-        }
-        try {
-            return database.existsByPhoneNumber(phoneNumber);
-        } catch (DatabaseOperationException e) {
-            String message = "An error occurred during checking if phone number exists in db.";
-            log.error(message, e);
-            throw new ServiceOperationException(message, e);
-        }
-    }
-
     public boolean existsById(Long id) throws ServiceOperationException {
         if (id == null) {
             log.error("Attempt to provide null id to check whether app user exists");

@@ -68,7 +68,7 @@ class AppUserControllerTest {
     }
 
     @Test
-    public void shouldReturnEmptyListOfAppUsersWhenThereAreNoInvoicesInTheDatabase() throws Exception {
+    public void shouldReturnEmptyListOfAppUsersWhenThereAreNoAppUsersInTheDatabase() throws Exception {
         List<AppUser> appUsers = new ArrayList<>();
         PageImpl<AppUser> emptyPage = new PageImpl<>(appUsers);
         when(appUserService.getFirstPageOfAppUsers()).thenReturn(emptyPage);

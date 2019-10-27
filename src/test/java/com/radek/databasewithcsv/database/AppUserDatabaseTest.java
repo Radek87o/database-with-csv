@@ -45,7 +45,7 @@ class AppUserDatabaseTest {
     }
 
     @Test
-    void shouldSaveInvoices() throws DatabaseOperationException {
+    void shouldSaveAppUsers() throws DatabaseOperationException {
         AppUser appUser1 = AppUserGenerator.generateAppUser();
         AppUser appUser2 = AppUserGenerator.generateAppUser();
 
